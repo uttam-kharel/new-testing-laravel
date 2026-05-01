@@ -7,10 +7,13 @@
         "dev": "vite",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
+        "lint:css": "stylelint \"resources/css/**/*.css\"",
+        "lint:css:fix": "stylelint \"resources/css/**/*.css\" --fix",
         "prepare": "husky"
     },
     "lint-staged": {
         "*.{js,ts,css,html,blade.php,json,md}": "prettier --write",
+        "*.css": "stylelint --fix",
         "*.php": "./vendor/bin/pint --dirty"
     },
     "devDependencies": {
@@ -24,6 +27,8 @@
         "prettier": "^3.9.5",
         "prettier-plugin-blade": "^3.2.2",
         "prettier-plugin-tailwindcss": "^0.8.1",
+        "stylelint": "^17.14.1",
+        "stylelint-config-standard": "^40.0.0",
         "tailwindcss": "^4.3.2",
         "vite": "^8.0.0"
     }
