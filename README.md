@@ -55,18 +55,26 @@ curl http://localhost:8090/
 | `ci.yml`      | every push & PR            | PHP 8.3 tests, Pint style check, Vite production build, Docker image build (catches broken Dockerfiles before they ship) |
 | `deploy.yml`  | push to `production`, PRs against it | Production deploy on push; preview deploy + URL comment on PR |
 
-Both run on GitHub Actions free minutes. The deploy workflow ships with **no
-secrets**, so it skips cleanly until you add them — activate it with three
-GitHub secrets (Settings → Secrets and variables → Actions):
+Both run on GitHub Actions free minutes. **Two deploy options — pick ONE** (see
+`GETTING_STARTED.md` §7c for the full walkthrough):
 
-```
-VERCEL_TOKEN      – Vercel → Settings → Tokens → Create
-VERCEL_ORG_ID     – from .vercel/project.json → "orgId"   (team_...)
-VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
-```
+- **Option A (recommended, zero secrets):** Vercel dashboard → **Add New →
+  Project → Import Git Repository** → pick this repo → framework **Other** →
+  Deploy. Then set Project → Settings → Git → **Production Branch** =
+  `production`, and add the 4 env vars. Every push to `production` auto-
+  deploys; every PR gets a free preview URL.
+- **Option B (workflow-driven):** add three GitHub secrets
+  (Settings → Secrets and variables → Actions):
 
-Prefer Vercel's native Git integration (dashboard → Add New → Project → Import
-Git repo) for zero-secret auto-deploys and free PR previews.
+  ```
+  VERCEL_TOKEN      – Vercel → Settings → Tokens → Create
+  VERCEL_ORG_ID     – from .vercel/project.json → "orgId"   (team_...)
+  VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
+  ```
+
+  The `deploy.yml` workflow ships with **no secrets** and skips cleanly until
+  you add them, so it's safe to leave untouched while Option A handles
+  deployments.
 
 ## Branch flow
 

@@ -244,7 +244,61 @@ This builds **exactly** what Vercel will build — composer install, npm build,
 migrations — and runs it in the same FrankenPHP runtime. If it works here, it
 works on Vercel.
 
-### 7c. Deploy
+### 7c. Deploy — two ways, pick ONE
+
+There are two ways to deploy. **Do not enable both** or you'll get double
+deployments. For a beginner, **Option A is easier** (zero secrets, everything
+automatic).
+
+| | Option A: Git integration | Option B: CLI + GitHub secrets |
+| --- | --- | --- |
+| Effort | ~3 minutes in the dashboard | ~10 minutes + token + secrets |
+| Secrets needed | **None** | 3 GitHub secrets |
+| Auto-deploys on push | ✅ | ✅ (via workflow) |
+| Preview URLs per PR | ✅ | ✅ (via workflow) |
+| Deploy trigger | Vercel watches GitHub | GitHub Actions calls Vercel |
+| Best for | Beginners, most projects | When you want deploys fully inside your workflows |
+
+#### Option A — Vercel Git integration (recommended) 🏆
+
+Vercel watches your GitHub repo and deploys automatically — no tokens, no
+secrets, no command line:
+
+1. Open [vercel.com](https://vercel.com) logged in as **your** account.
+2. Click **Add New → Project** (top-right).
+3. **Import Git Repository** → find `my-hospital` → **Import**.
+   - Vercel will ask for permissions the first time — allow it.
+   - Framework preset: choose **Other** (your `vercel.json` already says
+     "container runtime"; don't pick a PHP/Laravel preset — that's a different,
+     serverless setup).
+   - Click **Deploy**. Vercel reads `Dockerfile.vercel` and builds it.
+4. After the first deploy, set the **Production Branch**:
+   Project → **Settings → Git → Production Branch** → type `production`
+   → **Save**. Now only pushes to `production` go live; `main` stays a dev
+   branch.
+5. Add the environment variables: Project → **Settings → Environment
+   Variables** → add for **Production, Preview, Development**:
+
+   ```
+   APP_KEY   = your APP_KEY from .env (keep the SAME value forever)
+   APP_ENV   = production
+   APP_DEBUG = false
+   APP_URL   = https://<your-project>.vercel.app
+   ```
+
+   > **Why APP_KEY?** Laravel encrypts cookies with it and refuses to boot
+   > without it. Changing it breaks sessions/CSRF.
+
+6. Open your URL (e.g. `https://my-hospital.vercel.app`) — **live**. 🎉
+
+That's the whole setup. From now on: **push to `production` → auto-deploy,
+open a PR → free preview URL**. The GitHub Actions `deploy.yml` workflow in
+this repo stays safely skipped (it has no token) — leave it that way.
+
+#### Option B — CLI + GitHub secrets (the workflow way)
+
+If you'd rather have GitHub Actions do the deploying (and you'll add the
+`VERCEL_TOKEN` secret), this is the manual one-time setup:
 
 ```bash
 npx vercel login      # opens your browser — sign in (pick your account)
@@ -260,17 +314,20 @@ npx vercel env add APP_DEBUG production     # false
 npx vercel env add APP_URL production       # https://<your-project>.vercel.app
 ```
 
-> **Why APP_KEY?** Laravel encrypts cookies with it and refuses to boot without
-> it. Keep the **same value forever** — changing it breaks sessions/CSRF.
-
-Deploy:
+Deploy once to verify:
 
 ```bash
 npx vercel deploy --prod
 ```
 
-Vercel builds your Docker image, deploys it, and gives you a URL like
-`https://my-hospital.vercel.app`. Open it — your site is **live**. 🎉
+Then add the 3 GitHub secrets (Settings → Secrets → Actions) so the
+`deploy.yml` workflow can deploy on every `production` push:
+
+```
+VERCEL_TOKEN      → Vercel → Settings → Tokens → Create Token
+VERCEL_ORG_ID     → from .vercel/project.json → "orgId"
+VERCEL_PROJECT_ID → from .vercel/project.json → "projectId"
+```
 
 ---
 
