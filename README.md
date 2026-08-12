@@ -52,8 +52,8 @@ curl http://localhost:8090/
 
 | Workflow      | When                        | What it does                                            |
 | ------------- | --------------------------- | ------------------------------------------------------- |
-| `ci.yml`      | every push & PR            | PHP 8.3 tests, Pint style check, Vite production build  |
-| `deploy.yml`  | push to `production`       | Production deploy to Vercel (container image build)     |
+| `ci.yml`      | every push & PR            | PHP 8.3 tests, Pint style check, Vite production build, Docker image build (catches broken Dockerfiles before they ship) |
+| `deploy.yml`  | push to `production`, PRs against it | Production deploy on push; preview deploy + URL comment on PR |
 
 Both run on GitHub Actions free minutes. The deploy workflow ships with **no
 secrets**, so it skips cleanly until you add them — activate it with three

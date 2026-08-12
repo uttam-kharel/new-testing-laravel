@@ -52,3 +52,15 @@ jobs:
 
             - name: Build production assets
               run: npm run build
+
+    container:
+        name: Docker image build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            # Build the exact artifact that ships to Vercel so a broken
+            # Dockerfile (missing dep, bad migration, build failure) never
+            # reaches production. Mirrors `vercel build` on the container runtime.
+            - name: Build production image
+              run: docker build -f Dockerfile.vercel -t ci-check .
