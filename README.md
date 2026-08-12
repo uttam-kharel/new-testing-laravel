@@ -71,12 +71,14 @@ Git repo) for zero-secret auto-deploys and free PR previews.
 ## Branch flow
 
 - **`main`** — development. CI runs on every push/PR, but nothing deploys.
-- **`production`** — deployable. Push to it (or merge `main` into it) and Vercel
-  builds the container image and deploys to production.
+- **`production`** — deployable. Pushing to it builds the container image and
+  deploys to Vercel. **Protect it** (Settings → Branches → rule on
+  `production`: *Require a pull request + 1 approval + status checks*) so
+  changes can only arrive via reviewed PRs — see `GETTING_STARTED.md` §8.
 
 ```bash
 git checkout -b production && git push -u origin production   # one-time setup
-git checkout main && git push origin main:production          # ship on every release
+# ship: feature branch → PR against production → approve → merge (auto-deploys)
 ```
 
 ## Deploying (first time / new Vercel account)

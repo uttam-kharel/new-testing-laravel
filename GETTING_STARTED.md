@@ -298,29 +298,94 @@ New repository secret**.
 > The workflow is written to **skip cleanly** (exit 0, no red ❌) until you add
 > the secrets, so it's safe to push before configuring anything.
 
+### How GitHub Actions works (the mental model)
+
+GitHub Actions is a **free CI/CD runner farm** built into GitHub. Workflows
+live in `.github/workflows/*.yml` and are YAML files that say:
+
+```yaml
+on:
+    push:
+        branches: [production]   # WHEN does this run?
+
+jobs:
+    deploy:                      # WHAT does it do?
+        runs-on: ubuntu-latest   # a fresh Linux machine
+        steps:                   # a list of commands
+            - run: npx vercel deploy --prod
+```
+
+When the trigger fires, GitHub spins up a machine, runs your steps, and shows
+green/red in the **Actions** tab. Your repo has two workflows:
+
+| File | Triggers on | What it runs |
+| --- | --- | --- |
+| `ci.yml` | push to `main`/`production`, any PR | PHP tests, Pint style check, Vite build, **Docker image build** |
+| `deploy.yml` | push to `production` | Build + deploy to Vercel (production) |
+| `deploy.yml` | PR **against** `production` | Preview deploy + auto-comment the URL on the PR |
+
+Secrets (tokens) are stored in GitHub and injected into workflows as
+`${{ secrets.NAME }}` — they're never visible in your code. The deploy
+workflow is written to **skip cleanly** if the secret is missing, so it's safe
+to push before configuring anything.
+
 ### The branch flow this repo uses
 
 - **`main`** — development. Pushing here runs CI only (tests + build).
-- **`production`** — deployable. Pushing here builds the Docker image and
-  deploys to Vercel.
+  Safe to push to directly.
+- **`production`** — deployable. Only this branch publishes to Vercel. It
+  should be **protected** so nobody can push to it directly — changes arrive
+  only through reviewed pull requests.
+
+### 🛡️ Protect `production` (merge-only — you do this once in GitHub)
+
+Branch protection is a **GitHub setting** (needs an admin account). It makes
+`production` un-pushable: direct `git push origin production` is **rejected**;
+the only way in is a merged pull request.
+
+**Exact steps:**
+
+1. GitHub → repo → **Settings** (top tab) → **Branches** (left sidebar) →
+   **Add branch ruleset** (or *Add rule*).
+2. **Branch name pattern:** type `production`.
+3. Turn on **Require a pull request before merging**:
+   - *Require approvals* → **1**.
+   - *Dismiss stale approvals* — on.
+4. Turn on **Require status checks to pass before merging**:
+   - Search and select your CI checks — select **PHP tests & style**,
+     **Frontend build**, **Docker image build** (the job names from `ci.yml`).
+5. Turn on **Require branches to be up to date before merging**.
+6. Turn on **Do not allow bypassing the above settings**.
+7. Click **Create**.
+
+Now try `git push origin main:production` — GitHub **rejects** it with
+"protected branch" errors. That's exactly what we want. ✅
+
+> The same protection idea can be applied to `main` later (then you can't push
+> to `main` either — everything flows through PRs).
+
+### Ship a change (the PR-only daily workflow)
+
+With `production` protected, the release flow becomes:
 
 ```bash
-git checkout -b production && git push -u origin production   # one-time setup
-git checkout main
-git push origin main:production                              # ship every release
-```
-
-### Ship a change (the daily workflow)
-
-```bash
-# 1. Edit your code... then:
+# 1. Develop on a feature branch
+git checkout -b add-contact-form
+# ...edit code...
 git add .
-git commit -m "Update the welcome page"
-git push origin main            # CI runs
-git push origin main:production # CI + build + deploy
+git commit -m "Add contact form"
+git push -u origin add-contact-form
 ```
 
-Watch it live at **github.com/<you>/<repo>/actions**. All green = you're live.
+# 2. GitHub shows a yellow banner: "Compare & pull request" → click it.
+#    Base = production (or main), compare = your feature branch.
+#    CI runs + a Vercel preview URL is commented on the PR.
+# 3. A reviewer approves, checks are green → click **Merge pull request**.
+# 4. The merge commits to `production` → the deploy workflow builds the
+#    Docker image and deploys to Vercel automatically.
+
+Watch it live at **github.com/<you>/<repo>/actions**. All green = you're live,
+with zero manual steps and zero chance of pushing straight to production.
 
 ---
 
