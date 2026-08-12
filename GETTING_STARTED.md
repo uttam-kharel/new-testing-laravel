@@ -237,7 +237,7 @@ docker build -f Dockerfile.vercel -t my-hospital .
 docker run --rm -p 8090:80 \
   -e "APP_KEY=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')" \
   my-hospital
-open http://localhost:8090
+# open http://localhost:8090 in your browser (Mac: `open`, Linux: `xdg-open`)
 ```
 
 This builds **exactly** what Vercel will build — composer install, npm build,
@@ -480,6 +480,165 @@ the full steps and gotchas (old project/URL stays until deleted/transferred).
 - **Free-tier limits:** GitHub Actions — 2,000 min/month (private) or unlimited
   (public). Vercel Hobby — includes 4 CPU-hrs + 360 GB-hrs container memory per
   month, more than enough for a low-traffic site.
+
+---
+
+## 11. The complete file inventory (copy everything from here)
+
+Every file that makes this work — copy these into ANY new Laravel project and
+it deploys exactly like this one. The workflows (`ci.yml`, `deploy.yml`) and
+the full guides are in this repo under `.github/workflows/` — copy those too.
+
+| File | Purpose |
+| --- | --- |
+| `Dockerfile.vercel` | The production image recipe (full contents below) |
+| `Caddyfile` | FrankenPHP web-server config (full contents below) |
+| `vercel.json` | Tells Vercel "container project" (full contents below) |
+| `.dockerignore` | Keeps secrets/junk out of the image (full contents below) |
+| `bootstrap/app.php` | One added line: `trustProxies(at: '*')` |
+| `.github/workflows/ci.yml` | Tests + builds on every push/PR |
+| `.github/workflows/deploy.yml` | Deploys `production` to Vercel |
+
+### Dockerfile.vercel
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+# Stage 1: Composer dependencies (production only)
+FROM composer:2 AS composer-deps
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --no-progress --optimize-autoloader --no-scripts
+
+# Stage 2: Frontend assets (Vite build)
+FROM node:22-alpine AS assets
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY . .
+RUN npm run build
+
+# Stage 3: FrankenPHP runtime (Vercel container)
+FROM dunglas/frankenphp:1-php8.4-alpine
+WORKDIR /app
+
+# APP_KEY is injected by Vercel at runtime (and overridable at build time).
+ARG APP_KEY=
+ENV APP_KEY=${APP_KEY} \
+    APP_ENV=production \
+    APP_DEBUG=false \
+    LOG_CHANNEL=stderr \
+    SESSION_SECURE_COOKIE=true
+
+COPY --from=composer-deps /app/vendor ./vendor
+COPY --from=assets /app/public/build ./public/build
+COPY . .
+
+# Laravel bootstrap: writable storage, fresh SQLite file, production caches.
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache \
+    && touch database/database.sqlite \
+    && chown -R www-data:www-data storage bootstrap/cache database \
+    && php artisan package:discover --ansi \
+    && php artisan view:cache \
+    && php artisan migrate --force --no-interaction
+
+COPY Caddyfile /etc/caddy/Caddyfile
+
+ENV PORT=80
+EXPOSE 80
+
+CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
+```
+
+### Caddyfile
+
+```caddyfile
+:{$PORT:80} {
+    root * /app/public
+    encode zstd gzip
+    php_server
+}
+```
+
+### vercel.json
+
+```json
+{
+    "services": {
+        "api": {
+            "root": ".",
+            "entrypoint": "Dockerfile.vercel",
+            "runtime": "container"
+        }
+    },
+    "rewrites": [
+        { "source": "/(.*)", "destination": { "service": "api" } }
+    ]
+}
+```
+
+### .dockerignore
+
+```
+# Secrets & local environment — never ship these into the image
+.env
+.env.*
+!.env.example
+
+# Local dependencies — reinstalled fresh inside the image
+vendor
+node_modules
+
+# Build artifacts & caches
+public/build
+public/hot
+storage
+bootstrap/cache
+*.log
+
+# Local SQLite artifacts (untracked; the image creates its own)
+database/*.sqlite*
+
+# VCS & tooling
+.git
+.gitignore
+.dockerignore
+.idea
+.husky
+tests
+phpunit.xml
+
+# OS noise
+.DS_Store
+Thumbs.db
+```
+
+### The one line in bootstrap/app.php
+
+In `bootstrap/app.php`, inside the `->withMiddleware(...)` closure, add:
+
+```php
+$middleware->trustProxies(at: '*');
+```
+
+### Copy checklist for a brand-new project
+
+```bash
+# 1. Fresh Laravel project (or clone this one as the base)
+composer create-project laravel/laravel my-project
+cd my-project
+
+# 2. Copy the deploy files from this repo
+cp <this-repo>/Dockerfile.vercel .
+cp <this-repo>/Caddyfile .
+cp <this-repo>/vercel.json .
+cp <this-repo>/.dockerignore .
+cp -r <this-repo>/.github .
+
+# 3. Apply the one-line proxy fix in bootstrap/app.php
+# 4. Local setup: cp .env.example .env && php artisan key:generate
+# 5. Deploy: Option A (Vercel Git import) or Option B (CLI + secrets) — §7c
+```
 
 ---
 
