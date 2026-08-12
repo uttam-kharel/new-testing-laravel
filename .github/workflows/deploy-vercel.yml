@@ -8,18 +8,22 @@ name: Deploy to Vercel
 #   VERCEL_PROJECT_ID   – prj_...   (from `vercel link` → .vercel/project.json → "projectId")
 #
 # Behavior:
-#   - push to main      → production deploy (aliased to the project URL)
-#   - pull request      → preview deploy with a unique .vercel.app URL + PR comment
-#   - workflow_dispatch → manual production re-deploy
+#   - push to production → production deploy (aliased to the project URL)
+#   - pull request       → preview deploy with a unique .vercel.app URL + PR comment
+#   - workflow_dispatch  → manual production re-deploy
+#
+# `main` is the development branch; only the `production` branch deploys to
+# the live site. Merge `main` → `production` (or open a PR against
+# `production`) to ship.
 #
 # Without the VERCEL_TOKEN secret every deploy step exits 0 and skips, so the
 # workflow is safe to ship before the secrets exist.
 
 on:
     push:
-        branches: [main]
+        branches: [production]
     pull_request:
-        branches: [main]
+        branches: [production]
     workflow_dispatch:
 
 concurrency:

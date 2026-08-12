@@ -54,7 +54,7 @@ curl -H "X-Forwarded-Proto: https" http://127.0.0.1:8123/
 | Workflow                     | When                          | What it does                                                        |
 | ---------------------------- | ----------------------------- | ------------------------------------------------------------------- |
 | `ci.yml`                     | every push & PR               | PHP 8.3 tests, Pint style check, Vite production build              |
-| `deploy-vercel.yml`          | PRs / push to `main`          | Preview deploy + PR URL comment; production deploy on `main`        |
+| `deploy-vercel.yml`          | PRs / push to `production`    | Preview deploy + PR URL comment; production deploy on `production`  |
 
 Both run on GitHub Actions free minutes. The deploy workflow ships with **no
 secrets**, so it skips cleanly until you add them — activate it with three
@@ -66,7 +66,17 @@ VERCEL_ORG_ID     – from .vercel/project.json → "orgId"   (team_...)
 VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
 ```
 
-Then every push to `main` deploys to production and every PR gets a preview URL.
+## Branch flow
+
+- **`main`** — development. CI runs on every push/PR, but nothing deploys.
+- **`production`** — deployable. Push to it (or merge `main` into it, or open
+  a PR against it) and Vercel deploys to production; PRs against it get
+  preview URLs.
+
+```bash
+git checkout -b production && git push -u origin production   # one-time setup
+git checkout main && git push origin main:production          # ship on every release
+```
 
 ## Deploying (first time / new Vercel account)
 
