@@ -1,66 +1,143 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI — "Continuous Integration"
+#
+# What is CI?
+#   Every time you (or anyone) pushes code or opens a Pull Request, GitHub
+#   spins up a fresh Linux machine and runs the checks below automatically.
+#   The results appear as green (✅ pass) or red (❌ fail) circles next to the
+#   commit, and in the repo's "Actions" tab.
+#
+# Why do we need it?
+#   It catches mistakes BEFORE they reach the live site:
+#     - broken PHP code / failing tests
+#     - ugly or inconsistent code style
+#     - frontend (Tailwind/Vite) that doesn't compile
+#     - a Dockerfile that can't build (so Vercel would reject the deploy)
+#
+# Cost: 100% free on GitHub (2,000 minutes/month on private repos,
+# unlimited on public repos).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# "name" is just a label — it's what you see in the Actions tab.
 name: CI
 
+# ─────────────────────────────────────────────────────────────────────────────
+# "on" = WHEN does this workflow run?
+#
+#   push:          every time code is pushed to the `main` or `production`
+#                  branch (the two important long-lived branches).
+#   pull_request:  every Pull Request, no matter which branch it targets —
+#                  this is how we check someone's changes before merging.
+#
+# `pull_request:` with nothing under it means "run on ALL pull requests".
+# ─────────────────────────────────────────────────────────────────────────────
 on:
     push:
         branches: [main, production]
     pull_request:
 
+# ─────────────────────────────────────────────────────────────────────────────
+# "jobs" = WHAT work gets done. Three jobs run (in parallel) on three
+# separate machines. If ANY job fails, the whole workflow turns red.
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
+    # ── Job 1: PHP tests & style ────────────────────────────────────────────
+    # Checks that the PHP code actually works and is formatted consistently.
     php:
+        # "name" = the label shown in the Actions tab.
         name: PHP tests & style
+
+        # Which machine to run on. ubuntu-latest = a fresh Linux VM, free.
         runs-on: ubuntu-latest
+
+        # "steps" = the list of commands, run top to bottom.
         steps:
+            # Download (check out) your repo's code onto the fresh machine.
+            # Every job starts on an empty machine, so this is always step 1.
             - uses: actions/checkout@v4
 
+            # Install PHP 8.3 on the machine (it doesn't come preinstalled).
+            # "shivammathur/setup-php" is a popular community action that
+            # handles this; @v2 pins to a known-good version of that action.
             - uses: shivammathur/setup-php@v2
               with:
-                  php-version: '8.3'
-                  coverage: none
+                  php-version: '8.3' # same PHP version as local dev
+                  coverage: none     # we don't need code-coverage tooling
 
+            # Speed-up: save the `vendor/` folder (Composer's dependencies)
+            # between runs. If composer.lock didn't change, we reuse the
+            # cached folder instead of re-downloading everything.
             - name: Cache Composer dependencies
               uses: actions/cache@v4
               with:
-                  path: vendor
-                  key: composer-${{ hashFiles('composer.lock') }}
-                  restore-keys: composer-
+                  path: vendor                              # what to cache
+                  key: composer-${{ hashFiles('composer.lock') }} # cache name; changes when the lock file changes
+                  restore-keys: composer-                   # fallback: reuse any older composer cache
 
+            # Download all PHP packages this app needs (same as
+            # `composer install` locally). --prefer-dist = faster downloads.
             - name: Install PHP dependencies
               run: composer install --no-interaction --no-progress --prefer-dist
 
+            # Create a .env file and generate a fresh APP_KEY, exactly like
+            # you did locally on the first setup. Tests need an environment.
             - name: Prepare environment
               run: cp .env.example .env && php artisan key:generate
 
+            # Run Laravel's test suite (the same as `php artisan test`
+            # locally). Any failing test turns this job red.
             - name: Run tests
               run: php artisan test
 
+            # Pint is Laravel's code formatter (like prettier for PHP).
+            # --test means "only check, don't fix" — so this FAILS if any
+            # file isn't formatted the project's way. Fix locally with:
+            #   vendor/bin/pint
             - name: Check code style (Pint)
               run: vendor/bin/pint --test
 
+    # ── Job 2: Frontend build ───────────────────────────────────────────────
+    # Makes sure the Tailwind CSS / JavaScript actually compiles into the
+    # production files that the website needs.
     assets:
         name: Frontend build
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
 
+            # Install Node.js 22 (needed to run npm).
+            # "cache: npm" tells GitHub to cache npm's downloads too.
             - uses: actions/setup-node@v4
               with:
                   node-version: 22
                   cache: npm
 
+            # Install the frontend packages listed in package-lock.json.
+            # `npm ci` = clean install (slower but exact — great for CI).
+            # --ignore-scripts skips build scripts during install for speed.
             - name: Install npm dependencies
               run: npm ci --ignore-scripts
 
+            # Compile everything into public/build/ (minified CSS + JS).
+            # This is the same command Vercel runs inside the Dockerfile,
+            # so if it fails here, it would fail on Vercel too.
             - name: Build production assets
               run: npm run build
 
+    # ── Job 3: Docker image build ───────────────────────────────────────────
+    # Builds the EXACT Docker image that gets deployed to Vercel. This is the
+    # strongest safety net: it proves the whole production pipeline
+    # (composer install + migrations + frontend build + FrankenPHP runtime)
+    # works end-to-end — before anything ships.
     container:
         name: Docker image build
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
 
-            # Build the exact artifact that ships to Vercel so a broken
-            # Dockerfile (missing dep, bad migration, build failure) never
-            # reaches production. Mirrors `vercel build` on the container runtime.
+            # Build the production image (mirrors what Vercel does when it
+            # deploys: it reads Dockerfile.vercel and runs `docker build`).
+            # A broken Dockerfile, bad migration, or missing dependency
+            # fails here instead of on the live site.
             - name: Build production image
               run: docker build -f Dockerfile.vercel -t ci-check .

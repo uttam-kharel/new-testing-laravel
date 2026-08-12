@@ -1,23 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CD — "Continuous Deployment" to Vercel
+#
+# What is CD?
+#   CI checks the code (see ci.yml). CD SHIPS it: when code reaches the
+#   `production` branch, this workflow asks Vercel to build the Docker image
+#   (Dockerfile.vercel) and put it live at your .vercel.app URL.
+#
+# Why `production` and not `main`?
+#   `main` is your development branch — pushing there is safe and runs CI
+#   only. The live site may ONLY change via `production`:
+#     - push to production  → production deploy
+#     - PR against production → a temporary PREVIEW URL (free, isolated)
+#
+# How does it talk to Vercel?
+#   Via 3 "secrets" — hidden values stored in GitHub Settings →
+#   Secrets and variables → Actions (never visible in code):
+#     VERCEL_TOKEN      – your Vercel API key (vercel.com → Settings → Tokens)
+#     VERCEL_ORG_ID     – your team id, e.g. team_... (from .vercel/project.json)
+#     VERCEL_PROJECT_ID – your project id, e.g. prj_... (from .vercel/project.json)
+#
+# IMPORTANT — "skip by design":
+#   Until you add the VERCEL_TOKEN secret, every deploy step prints a message
+#   and exits successfully WITHOUT deploying. So this workflow is safe to
+#   push before you've configured anything — no red ❌, just a silent skip.
+#   If you're using Vercel's Git integration instead (Option A), leave this
+#   skipped forever — don't enable both, or you'll double-deploy.
+# ─────────────────────────────────────────────────────────────────────────────
 name: Deploy to Vercel
 
-# CI/CD for this Laravel app (Vercel container runtime — Dockerfile.vercel).
-#
-# Required GitHub repository secrets (Settings → Secrets and variables → Actions):
-#   VERCEL_TOKEN      – Vercel API token (from https://vercel.com/account/tokens)
-#   VERCEL_ORG_ID     – team_...  (from `vercel link` -> .vercel/project.json -> "orgId")
-#   VERCEL_PROJECT_ID – prj_...   (from `vercel link` -> .vercel/project.json -> "projectId")
-#
-# Behavior:
-#   - push to production     → production deploy (container image build on Vercel)
-#   - pull request → production → preview deploy with a unique .vercel.app URL + PR comment
-#   - workflow_dispatch      → manual production re-deploy
-#
-# `main` is the development branch; only the `production` branch deploys to
-# the live site. Merge `main` -> `production` (or `git push origin main:production`)
-# to ship. Prefer Vercel's native Git integration for zero-secret auto-deploys.
-#
-# Without the VERCEL_TOKEN secret every deploy step exits 0 and skips, so the
-# workflow is safe to ship before the secrets exist.
+# ─────────────────────────────────────────────────────────────────────────────
+# "on" = WHEN does this run?
+#   push:               only pushes to `production` (never main).
+#   pull_request:       PRs that target `production` → preview deployments.
+#   workflow_dispatch:  adds a "Run workflow" button in the Actions tab,
+#                       so you can re-deploy manually anytime.
+# ─────────────────────────────────────────────────────────────────────────────
 on:
     push:
         branches: [production]
@@ -25,63 +42,107 @@ on:
         branches: [production]
     workflow_dispatch:
 
+# ─────────────────────────────────────────────────────────────────────────────
+# "concurrency" = don't let deploys pile up.
+#   If a second deploy starts while one is running, the older one is
+#   cancelled (cancel-in-progress: true). Only the newest wins.
+#   group is per-branch (github.ref = the branch/tag that triggered it).
+# ─────────────────────────────────────────────────────────────────────────────
 concurrency:
     group: vercel-${{ github.ref }}
     cancel-in-progress: true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# "permissions" = the least privileges this workflow needs from GitHub.
+#   contents: read  – download the code (checkout).
+#   issues: write   – post the preview-URL comment on PRs.
+#   Nothing else. (Good security practice: never grant more than needed.)
+# ─────────────────────────────────────────────────────────────────────────────
 permissions:
     contents: read
     issues: write
 
+# ─────────────────────────────────────────────────────────────────────────────
+# "env" = environment variables available to EVERY job below.
+#   The org + project ids are read from secrets so the workflow never
+#   hardcodes which account/project it deploys to — switching Vercel
+#   accounts = just updating the secrets, zero code changes.
+# ─────────────────────────────────────────────────────────────────────────────
 env:
     VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
     VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 jobs:
-    # ── Preview deploy (pull requests against production) ─────────────
+    # ── Job 1: Preview deploy (only for pull requests) ─────────────────────
+    # Gives every PR a unique, throwaway URL so you can SEE the changes
+    # before they go live, then posts that URL as a comment on the PR.
     preview:
+        # `if` = run this job ONLY when the trigger was a pull request.
+        # (Runs in parallel with the deploy job for PRs... except the
+        # deploy job below excludes PRs — see its `if`.)
         if: github.event_name == 'pull_request'
         runs-on: ubuntu-latest
         steps:
+            # Get the code from the PR branch.
             - uses: actions/checkout@v4
 
+            # Deploy this PR as a PREVIEW (no --prod flag = not production).
+            # id: deploy lets later steps read this step's outputs.
             - name: Deploy preview to Vercel
               id: deploy
               env:
+                  # The token is injected as an env var (NOT written into
+                  # the command line) — safer and required, because GitHub
+                  # does not allow `secrets` inside `if:` conditions.
                   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
               run: |
+                  # ── The skip gate ─────────────────────────────────────
+                  # No token? Say so and exit 0 (= success, but nothing
+                  # happened). This keeps the workflow green before setup.
                   if [ -z "$VERCEL_TOKEN" ]; then
                     echo "VERCEL_TOKEN secret not set — skipping preview deploy."
                     exit 0
                   fi
+                  # Run the Vercel CLI: `deploy --yes` = accept defaults.
+                  # The command prints the new preview URL — we grab it
+                  # with grep (any https://xxx.vercel.app), keep the LAST
+                  # one, and save it into the step's output variable `url`.
                   url="$(npx --yes vercel@latest deploy --yes --token "$VERCEL_TOKEN" 2>&1 | grep -oE 'https://[a-z0-9-]+\.vercel\.app' | tail -n 1)"
                   echo "url=$url" >> "$GITHUB_OUTPUT"
                   echo "Preview URL: $url"
 
+            # Post the preview URL as a comment on the PR, but ONLY if a
+            # URL was actually produced (steps.deploy.outputs.url is set).
             - name: Comment preview URL on PR
               if: ${{ steps.deploy.outputs.url != '' }}
-              uses: actions/github-script@v7
+              uses: actions/github-script@v7 # a GitHub-provided action for API calls
               with:
                   script: |
+                      // This JavaScript runs with GitHub's API pre-authenticated.
                       const url = '${{ steps.deploy.outputs.url }}';
                       await github.rest.issues.createComment({
-                          issue_number: context.issue.number,
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
+                          issue_number: context.issue.number,  // which PR?
+                          owner: context.repo.owner,           // whose repo?
+                          repo: context.repo.repo,             // which repo?
                           body: `🚀 **Preview deployment ready:** ${url}`,
                       });
 
-    # ── Production deploy (push to production / manual) ───────────────
+    # ── Job 2: Production deploy (push to production / manual) ──────────────
+    # The real deal: builds the Docker image on Vercel and puts it live.
     deploy:
+        # Skip when the trigger was a pull request (previews handled above).
+        # So this runs on: push to production, or the manual button.
         if: github.event_name != 'pull_request'
         name: Deploy production
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
 
-            # `secrets` is not allowed in `if:` expressions, so the token is
-            # injected via env and the gate runs inside the shell: without the
-            # VERCEL_TOKEN secret the step exits 0 without deploying.
+            # ── The skip gate (same idea as the preview job) ────────────
+            # GitHub does NOT allow `secrets` inside `if:` expressions, so
+            # we can't condition the step that way. Instead we pass the
+            # token via `env` and check it INSIDE the shell command:
+            # no token → print a hint and exit 0 (skip, still green).
             - name: Deploy to Vercel
               env:
                   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -90,4 +151,9 @@ jobs:
                     echo "VERCEL_TOKEN secret not set — skipping deploy (add it in GitHub Settings -> Secrets to activate CD)"
                     exit 0
                   fi
+                  # --prod = deploy to PRODUCTION (the live URL).
+                  # --yes = don't ask interactive questions.
+                  # --token = authenticate with your Vercel API key.
+                  # Vercel reads vercel.json → sees the container service →
+                  # builds Dockerfile.vercel → deploys.
                   npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
