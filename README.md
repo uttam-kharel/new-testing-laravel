@@ -1,8 +1,7 @@
 # 🌐 Shubham International Hospital
 
-Laravel 13 + Tailwind CSS (Vite) landing site, hosted free on **Vercel** with
-the community **`vercel-php` runtime** (serverless Functions — no Docker, no
-Caddy, no credit card).
+Laravel 13 + Tailwind CSS (Vite) landing site, hosted free on **Vercel** via the
+[container runtime](https://vercel.com/docs/services) with FrankenPHP.
 
 **Production:** https://shubham-international-hospital.vercel.app
 
@@ -10,22 +9,20 @@ Caddy, no credit card).
 
 ## The stack (why this approach)
 
-This repo follows the same free stack as
-[`uttam-kharel/laravellivewire-sih`](https://github.com/uttam-kharel/laravellivewire-sih):
-a tiny PHP front controller (`api/index.php`) that runs Laravel's normal
-`public/index.php` on a Vercel Function.
-
 | Piece                | What it does                                                        |
 | -------------------- | ------------------------------------------------------------------- |
-| `vercel.json`        | Pins the `vercel-php@0.7.4` runtime; routes `/build/*` to static assets, everything else to the function |
-| `api/index.php`      | Fixes `SCRIPT_NAME` (so routes work), moves caches to `/tmp`, sessions→cookie, cache→array, logs→stderr |
-| `.vercelignore`      | Keeps `vendor`, `node_modules`, `.env`, tests, and storage out of uploads (Vercel reinstalls Composer deps at build) |
+| `Dockerfile.vercel`  | Multi-stage image: Composer (prod deps) → Vite build → FrankenPHP runtime. Creates the SQLite DB, runs migrations & caches views at build time |
+| `Caddyfile`          | FrankenPHP serves `public/` with `php_server` + compression, on Vercel's `PORT` |
+| `vercel.json`        | Container service (`Dockerfile.vercel`) with a catch-all rewrite to it |
+| `.dockerignore`      | Keeps `.env`, `vendor`, `node_modules`, `storage`, `tests` out of the image |
 | `bootstrap/app.php`  | Trusts forwarded proxy headers so asset/route URLs stay `https` behind Vercel's edge |
 
-Why not the Docker/FrankenPHP container route? It's Vercel's official path for
-PHP, but it needs a `Dockerfile` + `Caddyfile` per project and slower container
-builds. The Functions runtime is simpler to clone into every future project,
-ships faster, and sits on the standard free tier.
+Why the container route over the community `vercel-php` Functions runtime?
+It's Vercel's **official** path for PHP — no third-party runtime dependency, the
+full PHP environment works (writable filesystem, any extension, FrankenPHP
+concurrency), and the same `Dockerfile` + `Caddyfile` copy into every future
+project. It runs inside the free Hobby plan's included container usage
+(4 CPU-hrs + 360 GB-hrs of memory per month — plenty for a landing page).
 
 ## Local development
 
@@ -42,19 +39,21 @@ npm run dev        # terminal 1
 php artisan serve  # terminal 2
 ```
 
-Smoke-test the exact Vercel entrypoint locally (same wrapper the runtime uses):
+Smoke-test the production image locally (fresh composer + npm installs happen
+inside the build, exactly like Vercel):
 
 ```bash
-php -S 127.0.0.1:8123 api/index.php
-curl -H "X-Forwarded-Proto: https" http://127.0.0.1:8123/
+docker build -f Dockerfile.vercel -t hospital-test .
+docker run --rm -p 8090:80 -e APP_KEY="$(php -r 'echo "base64:".base64_encode(random_bytes(32));')" hospital-test
+curl http://localhost:8090/
 ```
 
 ## CI/CD (100% free)
 
-| Workflow                     | When                          | What it does                                                        |
-| ---------------------------- | ----------------------------- | ------------------------------------------------------------------- |
-| `ci.yml`                     | every push & PR               | PHP 8.3 tests, Pint style check, Vite production build              |
-| `deploy-vercel.yml`          | PRs / push to `production`    | Preview deploy + PR URL comment; production deploy on `production`  |
+| Workflow      | When                        | What it does                                            |
+| ------------- | --------------------------- | ------------------------------------------------------- |
+| `ci.yml`      | every push & PR            | PHP 8.3 tests, Pint style check, Vite production build  |
+| `deploy.yml`  | push to `production`       | Production deploy to Vercel (container image build)     |
 
 Both run on GitHub Actions free minutes. The deploy workflow ships with **no
 secrets**, so it skips cleanly until you add them — activate it with three
@@ -66,12 +65,14 @@ VERCEL_ORG_ID     – from .vercel/project.json → "orgId"   (team_...)
 VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
 ```
 
+Prefer Vercel's native Git integration (dashboard → Add New → Project → Import
+Git repo) for zero-secret auto-deploys and free PR previews.
+
 ## Branch flow
 
 - **`main`** — development. CI runs on every push/PR, but nothing deploys.
-- **`production`** — deployable. Push to it (or merge `main` into it, or open
-  a PR against it) and Vercel deploys to production; PRs against it get
-  preview URLs.
+- **`production`** — deployable. Push to it (or merge `main` into it) and Vercel
+  builds the container image and deploys to production.
 
 ```bash
 git checkout -b production && git push -u origin production   # one-time setup
@@ -97,19 +98,17 @@ npx vercel deploy --prod
 
 ## Production notes
 
-- **Database:** SQLite by default, but Vercel Functions have a read-only
-  filesystem and the app runs without a DB (sessions are cookies). When the
-  site needs real data, switch to a free Postgres like Neon and set
-  `DB_CONNECTION=pgsql` + `DATABASE_URL` (the deploy workflow then runs
-  `php artisan migrate --force` automatically).
+- **Database:** SQLite is created and migrated at **build time** inside the
+  image. It's ephemeral — it resets whenever Vercel scales the container down
+  and rebuilds. Perfect for a landing page; switch to Vercel Postgres (or a
+  free Neon instance) once real data arrives.
 - **Uploads:** use [Vercel Blob](https://vercel.com/docs/storage/vercel-blob)
-  (free tier) — the filesystem is ephemeral.
-- **Logs:** visible under Vercel → Project → Logs (stderr).
-- **Env vars** set in the Vercel dashboard always win over the `api/index.php`
-  defaults.
+  (free tier) — the container filesystem is ephemeral.
+- **Logs:** visible under Vercel → Project → Logs (stderr channel).
+- **Env vars** set in the Vercel dashboard win over the image defaults.
 
 ## Copying this to a future project
 
-1. `git clone` this repo (or copy `api/index.php`, `vercel.json`, `.vercelignore`, `.github/workflows/deploy-vercel.yml`).
-2. `vercel link --yes`, add the env vars above, `vercel deploy --prod`.
-3. Add the three GitHub secrets to enable auto-deploys.
+1. `git clone` this repo (or copy `Dockerfile.vercel`, `Caddyfile`, `vercel.json`, `.dockerignore`, `bootstrap/app.php` trust-proxy lines, and `.github/workflows/deploy.yml`).
+2. `vercel link --yes`, add the env vars above, `npx vercel deploy --prod`.
+3. Add the three GitHub secrets (or Vercel Git import) to enable auto-deploys.
