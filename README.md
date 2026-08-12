@@ -96,6 +96,52 @@ npx vercel deploy --prod
 > so encrypted cookies/sessions survive redeploys. Re-add the same vars for
 > `preview` if you want preview deploys fully working.
 
+## Switching to a different Vercel account (CI/CD)
+
+The CI/CD workflow is **account-agnostic** — it never knows which account it's
+under, because the org/project/token all come from GitHub secrets. Moving the
+project to another account needs **zero repo changes**, just these steps
+(≈ 5 minutes):
+
+```bash
+# 1. Log in with the new account (interactive)
+npx vercel login
+
+# 2. Create/link the project under the new account
+#    (or dashboard → Add New → Project → Import this repo)
+npx vercel link --yes
+
+# 3. Re-add the env vars — REUSE the same APP_KEY value so
+#    encrypted cookies/CSRF keep working across the switch
+npx vercel env add APP_KEY production       # paste the same value as before
+npx vercel env add APP_ENV production       # production
+npx vercel env add APP_DEBUG production     # false
+npx vercel env add APP_URL production       # https://<your-project>.vercel.app
+
+# 4. Create a token in the new account:
+#    https://vercel.com/account/tokens → Create Token
+```
+
+Then update the **three GitHub secrets** (Settings → Secrets and variables →
+Actions) with the new values:
+
+```
+VERCEL_TOKEN      – the new token from step 4
+VERCEL_ORG_ID     – from .vercel/project.json → "orgId"   (team_...)
+VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
+```
+
+That's it — the next `git push origin main:production` builds and deploys to
+the **new account** automatically.
+
+Notes:
+- `.vercel/` is gitignored, so the old account's IDs never leak into the repo.
+- The old account's project and URL stay until you delete or transfer them
+  there. If you want the same `<project>.vercel.app` URL on the new account,
+  delete the old project first (or transfer it).
+- Switching accounts does **not** touch the code, the Dockerfile, or the
+  workflows — only the secrets change.
+
 ## Production notes
 
 - **Database:** SQLite is created and migrated at **build time** inside the
