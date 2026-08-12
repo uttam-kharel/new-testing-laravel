@@ -1,0 +1,138 @@
+name: Deploy to Vercel
+
+# CI/CD for this Laravel app (vercel-php runtime on Vercel Functions).
+#
+# Required GitHub repository secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN        – Vercel API token (from https://vercel.com/account/tokens)
+#   VERCEL_ORG_ID       – team_...  (from `vercel link` → .vercel/project.json → "orgId")
+#   VERCEL_PROJECT_ID   – prj_...   (from `vercel link` → .vercel/project.json → "projectId")
+#
+# Behavior:
+#   - push to main      → production deploy (aliased to the project URL)
+#   - pull request      → preview deploy with a unique .vercel.app URL + PR comment
+#   - workflow_dispatch → manual production re-deploy
+#
+# Without the VERCEL_TOKEN secret every deploy step exits 0 and skips, so the
+# workflow is safe to ship before the secrets exist.
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    workflow_dispatch:
+
+concurrency:
+    group: vercel-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+    issues: write
+
+env:
+    VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+    VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+    # ── Preview deploy (pull requests) ─────────────────────────────
+    preview:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+
+            - name: Install PHP dependencies
+              run: composer install --no-interaction --prefer-dist --no-progress
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build frontend assets
+              run: npm run build
+
+            - name: Install Vercel CLI
+              run: npm install --global vercel@latest
+
+            - name: Deploy preview to Vercel
+              id: deploy
+              env:
+                  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+              run: |
+                  if [ -z "$VERCEL_TOKEN" ]; then
+                    echo "VERCEL_TOKEN secret not set — skipping preview deploy."
+                    exit 0
+                  fi
+                  url="$(npx vercel deploy --yes --token="$VERCEL_TOKEN" 2>&1 | grep -oE 'https://[a-z0-9-]+\.vercel\.app' | tail -n 1)"
+                  echo "url=$url" >> "$GITHUB_OUTPUT"
+                  echo "Preview URL: $url"
+
+            - name: Comment preview URL on PR
+              if: ${{ steps.deploy.outputs.url != '' }}
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const url = '${{ steps.deploy.outputs.url }}';
+                      await github.rest.issues.createComment({
+                          issue_number: context.issue.number,
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          body: `🚀 **Preview deployment ready:** ${url}`,
+                      });
+
+    # ── Production deploy (push to main / manual) ──────────────────
+    production:
+        if: github.event_name != 'pull_request'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+
+            - name: Install PHP dependencies
+              run: composer install --no-interaction --prefer-dist --no-progress
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build frontend assets
+              run: npm run build
+
+            # Optional: run migrations against an external Postgres (e.g. Neon)
+            # database. Runs ONLY when the DATABASE_URL secret exists.
+            - name: Run migrations (skips when DATABASE_URL secret unset)
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DB_CONNECTION: pgsql
+              run: |
+                  if [ -z "$DATABASE_URL" ]; then
+                    echo "DATABASE_URL secret not set — skipping migrations."
+                    exit 0
+                  fi
+                  cp .env.example .env
+                  php artisan migrate --force
+
+            - name: Install Vercel CLI
+              run: npm install --global vercel@latest
+
+            - name: Deploy production to Vercel
+              env:
+                  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+              run: |
+                  if [ -z "$VERCEL_TOKEN" ]; then
+                    echo "VERCEL_TOKEN secret not set — skipping production deploy."
+                    exit 0
+                  fi
+                  npx vercel --prod --yes --token="$VERCEL_TOKEN"

@@ -1,122 +1,105 @@
 # 🌐 Shubham International Hospital
 
-Laravel 13 + Tailwind CSS (Vite) landing site, hosted on **Vercel** via the
-[container runtime](https://vercel.com/docs/services) with FrankenPHP.
+Laravel 13 + Tailwind CSS (Vite) landing site, hosted free on **Vercel** with
+the community **`vercel-php` runtime** (serverless Functions — no Docker, no
+Caddy, no credit card).
 
 **Production:** https://shubham-international-hospital.vercel.app
 
 ---
+
+## The stack (why this approach)
+
+This repo follows the same free stack as
+[`uttam-kharel/laravellivewire-sih`](https://github.com/uttam-kharel/laravellivewire-sih):
+a tiny PHP front controller (`api/index.php`) that runs Laravel's normal
+`public/index.php` on a Vercel Function.
+
+| Piece                | What it does                                                        |
+| -------------------- | ------------------------------------------------------------------- |
+| `vercel.json`        | Pins the `vercel-php@0.7.4` runtime; routes `/build/*` to static assets, everything else to the function |
+| `api/index.php`      | Fixes `SCRIPT_NAME` (so routes work), moves caches to `/tmp`, sessions→cookie, cache→array, logs→stderr |
+| `.vercelignore`      | Keeps `vendor`, `node_modules`, `.env`, tests, and storage out of uploads (Vercel reinstalls Composer deps at build) |
+| `bootstrap/app.php`  | Trusts forwarded proxy headers so asset/route URLs stay `https` behind Vercel's edge |
+
+Why not the Docker/FrankenPHP container route? It's Vercel's official path for
+PHP, but it needs a `Dockerfile` + `Caddyfile` per project and slower container
+builds. The Functions runtime is simpler to clone into every future project,
+ships faster, and sits on the standard free tier.
 
 ## Local development
 
 Requires PHP 8.3+ and Node 20+.
 
 ```bash
-# 1. Install dependencies
 composer install
-npm install
-
-# 2. Environment
 cp .env.example .env
 php artisan key:generate
-
-# 3. Database (SQLite)
 touch database/database.sqlite
 php artisan migrate
-
-# 4. Run it
-npm run dev        # Vite dev server (terminal 1)
-php artisan serve  # Laravel (terminal 2)
+npm install
+npm run dev        # terminal 1
+php artisan serve  # terminal 2
 ```
 
-## Testing the production container locally
-
-The exact image Vercel builds can be tested on any machine with Docker:
+Smoke-test the exact Vercel entrypoint locally (same wrapper the runtime uses):
 
 ```bash
-docker build -f Dockerfile.vercel -t shubham-hospital .
-docker run -p 8080:80 -e APP_KEY="base64:$(php -r 'echo base64_encode(random_bytes(32));')" shubham-hospital
-curl http://localhost:8080/
+php -S 127.0.0.1:8123 api/index.php
+curl -H "X-Forwarded-Proto: https" http://127.0.0.1:8123/
 ```
 
-## Deploying to Vercel
+## CI/CD (100% free)
 
-The repo carries everything Vercel needs:
+| Workflow                     | When                          | What it does                                                        |
+| ---------------------------- | ----------------------------- | ------------------------------------------------------------------- |
+| `ci.yml`                     | every push & PR               | PHP 8.3 tests, Pint style check, Vite production build              |
+| `deploy-vercel.yml`          | PRs / push to `main`          | Preview deploy + PR URL comment; production deploy on `main`        |
 
-| File                | Purpose                                                        |
-| ------------------- | -------------------------------------------------------------- |
-| `Dockerfile.vercel` | Multi-stage build: composer deps → Vite assets → FrankenPHP     |
-| `Caddyfile`         | Serves `public/`, binds to Vercel's `PORT`                     |
-| `vercel.json`       | Declares the container service + catch-all rewrite             |
-| `.dockerignore`     | Keeps `.env`, `vendor`, `node_modules` out of the image        |
+Both run on GitHub Actions free minutes. The deploy workflow ships with **no
+secrets**, so it skips cleanly until you add them — activate it with three
+GitHub secrets (Settings → Secrets and variables → Actions):
 
-### First deploy (CLI)
+```
+VERCEL_TOKEN      – Vercel → Settings → Tokens → Create
+VERCEL_ORG_ID     – from .vercel/project.json → "orgId"   (team_...)
+VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
+```
+
+Then every push to `main` deploys to production and every PR gets a preview URL.
+
+## Deploying (first time / new Vercel account)
 
 ```bash
-npm i -g vercel          # or use: npx vercel
-vercel login
-vercel link --yes        # links the project, creates .vercel/
-vercel env add APP_KEY production     # required — Laravel boot fails without it
-vercel env add APP_ENV production     # production
-vercel env add APP_DEBUG production   # false
-vercel env add APP_URL production     # https://<your-project>.vercel.app
-vercel deploy --prod
+npx vercel login          # interactive — pick the account
+npx vercel link --yes     # creates/links the project, writes .vercel/project.json
+npx vercel env add APP_KEY production       # required — Laravel boot fails without it
+npx vercel env add APP_ENV production       # production
+npx vercel env add APP_DEBUG production     # false
+npx vercel env add APP_URL production       # https://<your-project>.vercel.app
+npx vercel deploy --prod
 ```
 
-> **Note:** `APP_KEY` is mandatory. Set it once (e.g.
-> `base64:$(php -r 'echo base64_encode(random_bytes(32));')`) and keep it
-> stable so encrypted cookies/sessions survive redeploys.
-
-## CI/CD (100% free — no credit card)
-
-Everything runs on free tiers: **GitHub Actions** (unlimited minutes on public
-repos, 2,000 min/month on private) + **Vercel Hobby** (free forever, includes
-container/Fluid compute allowances).
-
-Workflows live in `.github/workflows/`:
-
-| Workflow       | When                  | What it does                                                        |
-| -------------- | --------------------- | ------------------------------------------------------------------- |
-| `ci.yml`       | every push & PR       | PHP 8.3 tests, Pint style check, and a Vite production build        |
-| `deploy.yml`   | push to `main`        | Deploys to Vercel via the CLI — **only if** you add the token below |
-
-### Steps
-
-1. **Push this repo to GitHub** (free account): create an empty repo, then
-
-   ```bash
-   git remote add origin https://github.com/<you>/shubham-international-hospital.git
-   git push -u origin main
-   ```
-
-   CI runs automatically on every push/PR from that point on.
-
-2. **Connect Vercel (recommended, zero secrets):** in the Vercel dashboard go to
-   **Add New → Project → Import Git Repository**. Vercel then auto-deploys on
-   every push to `main` and builds free preview deployments for each PR.
-   *Choose this **or** the token approach below — not both.*
-
-3. **Alternative CD via Actions:** create a free token at
-   Vercel → **Settings → Tokens → Create**, then add it as a GitHub secret:
-   **Settings → Secrets and variables → Actions → `VERCEL_TOKEN`**. The
-   `deploy.yml` job activates and deploys on every push to `main`.
-
-### What you get
-
-- Tests, lint, and a production asset build on every push/PR — green checks
-  before merging.
-- Automatic production deploys on `main`, plus per-PR preview URLs.
-- Nothing to pay: no plan upgrade, no credit card, no usage over the included
-  free allowances for a site of this size.
+> **APP_KEY is mandatory.** Generate once with
+> `base64:$(php -r 'echo base64_encode(random_bytes(32));')` and keep it stable
+> so encrypted cookies/sessions survive redeploys. Re-add the same vars for
+> `preview` if you want preview deploys fully working.
 
 ## Production notes
 
-- The app runs on a **container service** (Fluid compute): it scales to zero
-  when idle and cold-starts on demand — first request after idle takes ~1s.
-- The SQLite database is baked in at build time (`php artisan migrate`) and is
-  **ephemeral** — writes are lost when the instance scales down. Fine for the
-  current landing page; when the app grows real data, switch to
-  [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres) and set
-  `DB_CONNECTION=pgsql` + the Postgres env vars.
-- Storage (`storage/`) is also ephemeral; uploads should go to
-  [Vercel Blob](https://vercel.com/docs/storage/vercel-blob).
+- **Database:** SQLite by default, but Vercel Functions have a read-only
+  filesystem and the app runs without a DB (sessions are cookies). When the
+  site needs real data, switch to a free Postgres like Neon and set
+  `DB_CONNECTION=pgsql` + `DATABASE_URL` (the deploy workflow then runs
+  `php artisan migrate --force` automatically).
+- **Uploads:** use [Vercel Blob](https://vercel.com/docs/storage/vercel-blob)
+  (free tier) — the filesystem is ephemeral.
+- **Logs:** visible under Vercel → Project → Logs (stderr).
+- **Env vars** set in the Vercel dashboard always win over the `api/index.php`
+  defaults.
+
+## Copying this to a future project
+
+1. `git clone` this repo (or copy `api/index.php`, `vercel.json`, `.vercelignore`, `.github/workflows/deploy-vercel.yml`).
+2. `vercel link --yes`, add the env vars above, `vercel deploy --prod`.
+3. Add the three GitHub secrets to enable auto-deploys.
