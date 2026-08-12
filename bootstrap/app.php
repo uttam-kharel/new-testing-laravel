@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Vercel terminates TLS at its edge and proxies to the container over
+        // HTTP, so trust the forwarded headers to keep asset()/route() URLs
+        // on the https scheme (fixes mixed-content blocking of built assets).
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
