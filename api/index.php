@@ -16,16 +16,38 @@ $_SERVER['PHP_SELF'] = '/index.php';
 // Vercel Functions run on a read-only filesystem (only /tmp is writable), so
 // point every file-based cache at /tmp and log to stderr (Vercel Function Logs).
 // Each is guarded so an explicit env var set in the Vercel dashboard wins.
-if (!getenv('APP_CONFIG_CACHE'))    putenv('APP_CONFIG_CACHE=/tmp/config.php');
-if (!getenv('APP_ROUTES_CACHE'))    putenv('APP_ROUTES_CACHE=/tmp/routes-v7.php');
-if (!getenv('APP_EVENTS_CACHE'))    putenv('APP_EVENTS_CACHE=/tmp/events.php');
-if (!getenv('APP_PACKAGES_CACHE'))  putenv('APP_PACKAGES_CACHE=/tmp/packages.php');
-if (!getenv('APP_SERVICES_CACHE'))  putenv('APP_SERVICES_CACHE=/tmp/services.php');
-if (!getenv('VIEW_COMPILED_PATH'))  putenv('VIEW_COMPILED_PATH=/tmp/views');
-if (!getenv('LOG_CHANNEL'))         putenv('LOG_CHANNEL=stderr');
-if (!getenv('SESSION_DRIVER'))      putenv('SESSION_DRIVER=cookie');
-if (!getenv('SESSION_SECURE_COOKIE')) putenv('SESSION_SECURE_COOKIE=true');
-if (!getenv('CACHE_STORE'))         putenv('CACHE_STORE=array');
-if (!getenv('QUEUE_CONNECTION'))    putenv('QUEUE_CONNECTION=sync');
+if (! getenv('APP_CONFIG_CACHE')) {
+    putenv('APP_CONFIG_CACHE=/tmp/config.php');
+}
+if (! getenv('APP_ROUTES_CACHE')) {
+    putenv('APP_ROUTES_CACHE=/tmp/routes-v7.php');
+}
+if (! getenv('APP_EVENTS_CACHE')) {
+    putenv('APP_EVENTS_CACHE=/tmp/events.php');
+}
+if (! getenv('APP_PACKAGES_CACHE')) {
+    putenv('APP_PACKAGES_CACHE=/tmp/packages.php');
+}
+if (! getenv('APP_SERVICES_CACHE')) {
+    putenv('APP_SERVICES_CACHE=/tmp/services.php');
+}
+if (! getenv('VIEW_COMPILED_PATH')) {
+    putenv('VIEW_COMPILED_PATH=/tmp/views');
+}
+if (! getenv('LOG_CHANNEL')) {
+    putenv('LOG_CHANNEL=stderr');
+}
+if (! getenv('SESSION_DRIVER')) {
+    putenv('SESSION_DRIVER=cookie');
+}
+if (! getenv('SESSION_SECURE_COOKIE')) {
+    putenv('SESSION_SECURE_COOKIE=true');
+}
+if (! getenv('CACHE_STORE')) {
+    putenv('CACHE_STORE=array');
+}
+if (! getenv('QUEUE_CONNECTION')) {
+    putenv('QUEUE_CONNECTION=sync');
+}
 
 require __DIR__.'/../public/index.php';
