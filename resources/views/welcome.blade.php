@@ -23,6 +23,24 @@
             Shubham International Hospital
         </h1>
         <p class="mt-4 text-lg text-[#4B6363]">A new digital experience is on its way. Our website will be launching soon, making it easier to explore our services, departments, doctors, and patient resources.</p>
+        <div class="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div class="rounded-xl border border-[#0E7C7B]/15 bg-white px-4 py-5">
+                <p class="text-2xl">🩺</p>
+                <p class="mt-2 text-sm font-semibold text-[#0B2027]">Services</p>
+            </div>
+            <div class="rounded-xl border border-[#0E7C7B]/15 bg-white px-4 py-5">
+                <p class="text-2xl">🏥</p>
+                <p class="mt-2 text-sm font-semibold text-[#0B2027]">Departments</p>
+            </div>
+            <div class="rounded-xl border border-[#0E7C7B]/15 bg-white px-4 py-5">
+                <p class="text-2xl">👨‍⚕️</p>
+                <p class="mt-2 text-sm font-semibold text-[#0B2027]">Doctors</p>
+            </div>
+            <div class="rounded-xl border border-[#0E7C7B]/15 bg-white px-4 py-5">
+                <p class="text-2xl">📋</p>
+                <p class="mt-2 text-sm font-semibold text-[#0B2027]">Patient Resources</p>
+            </div>
+        </div>
         <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a
                 href="mailto:shubhamintlhospital@gmail.com"
