@@ -1,0 +1,60 @@
+name: 🐛 Bug report
+description: Something isn't working — tell us what happened
+title: "[Bug]: "
+labels: ["bug"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Thanks for taking the time to report a bug! Fill in the fields below — the more detail, the faster we can fix it.
+    - type: textarea
+      id: what-happened
+      attributes:
+          label: What happened?
+          description: A clear description of the bug you hit.
+          placeholder: "e.g. The welcome page shows a broken asset / a 500 error on /"
+      validations:
+          required: true
+    - type: textarea
+      id: expected
+      attributes:
+          label: What did you expect to happen?
+          description: The behavior you expected instead.
+      validations:
+          required: true
+    - type: textarea
+      id: reproduce
+      attributes:
+          label: Steps to reproduce
+          description: How can we reproduce it from a clean state?
+          value: |
+              1. Go to ...
+              2. Click ...
+              3. See the error
+      validations:
+          required: true
+    - type: input
+      id: environment
+      attributes:
+          label: Environment
+          description: Which URL/branch/device/browser? (e.g. production URL, Chrome on Windows, mobile Safari)
+          placeholder: "https://shubham-international-hospital.vercel.app, Chrome 120, Windows"
+      validations:
+          required: false
+    - type: textarea
+      id: logs
+      attributes:
+          label: Relevant logs or errors
+          description: Paste any error messages, console output, or Vercel Logs snippets (from Vercel → Project → Logs).
+          render: shell
+      validations:
+          required: false
+    - type: checkboxes
+      id: checks
+      attributes:
+          label: Before submitting
+          options:
+              - label: I checked that this bug still happens on the latest deploy
+              - label: I searched existing issues for a duplicate
+      validations:
+          required: true

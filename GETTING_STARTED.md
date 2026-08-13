@@ -292,7 +292,7 @@ secrets, no command line:
 6. Open your URL (e.g. `https://my-hospital.vercel.app`) — **live**. 🎉
 
 That's the whole setup. From now on: **push to `production` → auto-deploy,
-open a PR → free preview URL**. The GitHub Actions `deploy.yml` workflow in
+open a PR → free preview URL**. The GitHub Actions `deploy-vercel.yml` workflow in
 this repo stays safely skipped (it has no token) — leave it that way.
 
 #### Option B — CLI + GitHub secrets (the workflow way)
@@ -321,7 +321,7 @@ npx vercel deploy --prod
 ```
 
 Then add the 3 GitHub secrets (Settings → Secrets → Actions) so the
-`deploy.yml` workflow can deploy on every `production` push:
+`deploy-vercel.yml` workflow can deploy on every `production` push:
 
 ```
 VERCEL_TOKEN      → Vercel → Settings → Tokens → Create Token
@@ -336,11 +336,11 @@ VERCEL_PROJECT_ID → from .vercel/project.json → "projectId"
 CI/CD = "every time you push, the computer runs your tests and deploys for
 you." Add two workflow files under `.github/workflows/` in your repo:
 
-**`.github/workflows/ci.yml`** — runs on every push/PR: PHP tests, code-style
+**`.github/workflows/check.yml`** — runs on every push/PR: PHP tests, code-style
 check (Pint), frontend build, and a Docker image build so a broken Dockerfile
 never ships.
 
-**`.github/workflows/deploy.yml`** — deploys to Vercel. It reads three GitHub
+**`.github/workflows/deploy-vercel.yml`** — deploys to Vercel. It reads three GitHub
 secrets:
 
 ```
@@ -377,9 +377,9 @@ green/red in the **Actions** tab. Your repo has two workflows:
 
 | File | Triggers on | What it runs |
 | --- | --- | --- |
-| `ci.yml` | push to `main`/`production`, any PR | PHP tests, Pint style check, Vite build, **Docker image build** |
-| `deploy.yml` | push to `production` | Build + deploy to Vercel (production) |
-| `deploy.yml` | PR **against** `production` | Preview deploy + auto-comment the URL on the PR |
+| `check.yml` | push to `main`/`production`, any PR | PHP tests, Pint style check, Vite build, **Docker image build** |
+| `deploy-vercel.yml` | push to `production` | Build + deploy to Vercel (production) |
+| `deploy-vercel.yml` | PR **against** `production` | Preview deploy + auto-comment the URL on the PR |
 
 Secrets (tokens) are stored in GitHub and injected into workflows as
 `${{ secrets.NAME }}` — they're never visible in your code. The deploy
@@ -410,7 +410,7 @@ the only way in is a merged pull request.
    - *Dismiss stale approvals* — on.
 4. Turn on **Require status checks to pass before merging**:
    - Search and select your CI checks — select **PHP tests & style**,
-     **Frontend build**, **Docker image build** (the job names from `ci.yml`).
+     **Frontend build**, **Docker image build** (the job names from `check.yml`).
 5. Turn on **Require branches to be up to date before merging**.
 6. Turn on **Do not allow bypassing the above settings**.
 7. Click **Create**.
@@ -486,7 +486,7 @@ the full steps and gotchas (old project/URL stays until deleted/transferred).
 ## 11. The complete file inventory (copy everything from here)
 
 Every file that makes this work — copy these into ANY new Laravel project and
-it deploys exactly like this one. The workflows (`ci.yml`, `deploy.yml`) and
+it deploys exactly like this one. The workflows (`check.yml`, `deploy-vercel.yml`) and
 the full guides are in this repo under `.github/workflows/` — copy those too.
 
 | File | Purpose |
@@ -496,8 +496,8 @@ the full guides are in this repo under `.github/workflows/` — copy those too.
 | `vercel.json` | Tells Vercel "container project" (full contents below) |
 | `.dockerignore` | Keeps secrets/junk out of the image (full contents below) |
 | `bootstrap/app.php` | One added line: `trustProxies(at: '*')` |
-| `.github/workflows/ci.yml` | Tests + builds on every push/PR |
-| `.github/workflows/deploy.yml` | Deploys `production` to Vercel |
+| `.github/workflows/check.yml` | Tests + builds on every push/PR |
+| `.github/workflows/deploy-vercel.yml` | Deploys `production` to Vercel |
 
 ### Dockerfile.vercel
 

@@ -50,10 +50,10 @@ curl http://localhost:8090/
 
 ## CI/CD (100% free)
 
-| Workflow      | When                        | What it does                                            |
-| ------------- | --------------------------- | ------------------------------------------------------- |
-| `ci.yml`      | every push & PR            | PHP 8.3 tests, Pint style check, Vite production build, Docker image build (catches broken Dockerfiles before they ship) |
-| `deploy.yml`  | push to `production`, PRs against it | Production deploy on push; preview deploy + URL comment on PR |
+| Workflow              | When                               | What it does                                            |
+| --------------------- | ---------------------------------- | ------------------------------------------------------- |
+| `check.yml`           | every push & PR                    | PHP 8.3 tests, Pint style check, Vite production build, Docker image build (catches broken Dockerfiles before they ship) |
+| `deploy-vercel.yml`   | push to `production`, PRs against it | Production deploy on push; preview deploy + URL comment on PR |
 
 Both run on GitHub Actions free minutes. **Two deploy options — pick ONE** (see
 `GETTING_STARTED.md` §7c for the full walkthrough):
@@ -72,7 +72,7 @@ Both run on GitHub Actions free minutes. **Two deploy options — pick ONE** (se
   VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
   ```
 
-  The `deploy.yml` workflow ships with **no secrets** and skips cleanly until
+  The `deploy-vercel.yml` workflow ships with **no secrets** and skips cleanly until
   you add them, so it's safe to leave untouched while Option A handles
   deployments.
 
@@ -82,7 +82,7 @@ Two branches exist (both pushed to GitHub):
 
 - **`main`** — development. CI runs on every push/PR, but nothing deploys.
 - **`production`** — deployable. Pushing to it builds the container image and
-  deploys to Vercel (via the `deploy.yml` workflow + GitHub secrets).
+  deploys to Vercel (via the `deploy-vercel.yml` workflow + GitHub secrets).
 
 **Protect `production`** (Settings → Branches → Add rule on `production`:
 *Require a pull request + 1 approval + status checks*) so changes can only
@@ -94,8 +94,17 @@ git checkout -b my-feature
 # ...edit, commit...
 git push -u origin my-feature
 # open a PR against `production` → CI runs, Vercel posts a preview URL →
-# approve + merge → deploy.yml builds the image and deploys to Vercel
+# approve + merge → deploy-vercel.yml builds the image and deploys to Vercel
 ```
+
+## Templates
+
+- **PRs** open with `.github/PULL_REQUEST_TEMPLATE.md` — change summary, test
+  checklist, and a deploy note so everyone knows a merge to `production` goes
+  live.
+- **Issues** use form templates: `.github/ISSUE_TEMPLATE/bug_report.yml` and
+  `.github/ISSUE_TEMPLATE/feature_request.yml`.
+
 
 > A push straight to `main` never deploys anything — only `production` does.
 
@@ -175,6 +184,6 @@ Notes:
 
 ## Copying this to a future project
 
-1. `git clone` this repo (or copy `Dockerfile.vercel`, `Caddyfile`, `vercel.json`, `.dockerignore`, `bootstrap/app.php` trust-proxy lines, and `.github/workflows/deploy.yml`).
+1. `git clone` this repo (or copy `Dockerfile.vercel`, `Caddyfile`, `vercel.json`, `.dockerignore`, `bootstrap/app.php` trust-proxy lines, and `.github/workflows/deploy-vercel.yml`).
 2. `vercel link --yes`, add the env vars above, `npx vercel deploy --prod`.
 3. Add the three GitHub secrets (or Vercel Git import) to enable auto-deploys.

@@ -1,0 +1,40 @@
+name: ✨ Feature request
+description: Suggest an idea for this project
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Thanks for suggesting a feature! Describe the problem and your proposed solution below.
+    - type: textarea
+      id: problem
+      attributes:
+          label: Problem or motivation
+          description: What are you trying to do that the site can't do today? Who is this for?
+          placeholder: "e.g. Visitors need a contact form to reach the hospital, but there's only an email link."
+      validations:
+          required: true
+    - type: textarea
+      id: solution
+      attributes:
+          label: Proposed solution
+          description: What should the feature look like or do?
+      validations:
+          required: true
+    - type: textarea
+      id: alternatives
+      attributes:
+          label: Alternatives you considered
+          description: Any other approaches that would also solve the problem?
+      validations:
+          required: false
+    - type: checkboxes
+      id: scope
+      attributes:
+          label: Scope
+          options:
+              - label: This is a landing-page feature (no backend/database changes)
+              - label: This needs new infrastructure (database, storage, auth, etc.)
+      validations:
+          required: true

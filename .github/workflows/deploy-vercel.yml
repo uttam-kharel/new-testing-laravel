@@ -2,7 +2,7 @@
 # CD — "Continuous Deployment" to Vercel
 #
 # What is CD?
-#   CI checks the code (see ci.yml). CD SHIPS it: when code reaches the
+#   CI checks the code (see check.yml). CD SHIPS it: when code reaches the
 #   `production` branch, this workflow asks Vercel to build the Docker image
 #   (Dockerfile.vercel) and put it live at your .vercel.app URL.
 #
