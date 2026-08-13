@@ -1,30 +1,67 @@
 # syntax=docker/dockerfile:1
+# (The "syntax" line enables modern Dockerfile features on Vercel's builder.)
 
 # ============================================================
-# Stage 1: Composer dependencies (production only)
+# What this file is
+#   Vercel (container runtime) reads vercel.json → entrypoint
+#   "Dockerfile.vercel" → runs `docker build` with this file.
+#   The result is the exact image that serves your live site.
+#
+# Multi-stage layout (3 stages, 1 final image):
+#   Stage 1 builds the PHP dependencies  (vendor/)
+#   Stage 2 builds the frontend assets   (public/build/)
+#   Stage 3 assembles the runtime image  (FrankenPHP + your app)
+# Only what Stage 3 copies actually ships — the build stages leave
+# no trace, which keeps the final image small.
+# ============================================================
+
+# ============================================================
+# Stage 1 — PHP dependencies (Composer)
 # ============================================================
 FROM composer:2 AS composer-deps
 WORKDIR /app
+
+# Copy ONLY the manifest files first (not the code) so Docker can
+# cache this layer: if composer.lock hasn't changed, this step is
+# reused on the next build instead of re-resolving everything.
 COPY composer.json composer.lock ./
+
+# --no-dev               : install production packages only (no tests/tools)
+# --optimize-autoloader  : pre-generate the optimized classmap (faster boot)
+# --no-scripts           : skip artisan hooks here — they need the full app,
+#                          so we run them later in Stage 3 where code exists
 RUN composer install --no-dev --no-interaction --no-progress --optimize-autoloader --no-scripts
 
 # ============================================================
-# Stage 2: Frontend assets (Vite build)
+# Stage 2 — Frontend assets (Node + Vite)
+#   Compiles Tailwind CSS / JS into public/build/.
 # ============================================================
 FROM node:22-alpine AS assets
 WORKDIR /app
+
 COPY package.json package-lock.json ./
+
+# npm ci = clean install straight from the lockfile: exact versions,
+# no surprises. --ignore-scripts skips third-party install scripts.
 RUN npm ci --ignore-scripts
+
+# Copy the whole repo, then run the production frontend build.
 COPY . .
 RUN npm run build
 
 # ============================================================
-# Stage 3: FrankenPHP runtime (Vercel container)
+# Stage 3 — FrankenPHP runtime (the actual Vercel container)
+#   FrankenPHP = Caddy web server + PHP in one binary (see Caddyfile).
 # ============================================================
 FROM dunglas/frankenphp:1-php8.4-alpine
 WORKDIR /app
 
-# APP_KEY is injected by Vercel at runtime (and overridable at build time).
+# APP_KEY comes from Vercel at runtime (Dashboard → Environment
+# Variables) — Laravel refuses to boot without it. The ARG lets you
+# bake one in at build time too (handy for local smoke tests).
+# The rest are production defaults, all overridable via Vercel env vars:
+#   LOG_CHANNEL=stderr          → logs land in Vercel's Logs viewer
+#   SESSION_SECURE_COOKIE=true  → cookies only ever sent over https
 ARG APP_KEY=
 ENV APP_KEY=${APP_KEY} \
     APP_ENV=production \
@@ -32,17 +69,22 @@ ENV APP_KEY=${APP_KEY} \
     LOG_CHANNEL=stderr \
     SESSION_SECURE_COOKIE=true
 
-# Production dependencies
+# Production PHP dependencies (from Stage 1)
 COPY --from=composer-deps /app/vendor ./vendor
 
-# Compiled frontend assets
+# Compiled frontend assets (from Stage 2)
 COPY --from=assets /app/public/build ./public/build
 
-# Application source (see .dockerignore for exclusions)
+# The rest of the application code (see .dockerignore for what's excluded)
 COPY . .
 
-# Laravel bootstrap: writable storage, fresh SQLite file, and production caches.
-# (route:cache is intentionally omitted: the welcome route is a closure.)
+# Laravel bootstrap — all run ONCE at build time, so the container is
+# ready to serve the instant it boots:
+#   • create Laravel's cache/session/view directories
+#   • create the SQLite database file
+#   • give the PHP user (www-data) write access to storage/ + database/
+#   • discover packages, cache compiled views, run migrations
+# (route:cache is intentionally omitted — the welcome route is a closure.)
 RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache \
     && touch database/database.sqlite \
     && chown -R www-data:www-data storage bootstrap/cache database \
@@ -50,9 +92,13 @@ RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/fra
     && php artisan view:cache \
     && php artisan migrate --force --no-interaction
 
+# FrankenPHP reads this Caddyfile on boot — it defines what to serve.
 COPY Caddyfile /etc/caddy/Caddyfile
 
+# Vercel routes traffic to the PORT env var; 80 is the Docker default.
+# Must match the ":{$PORT:80}" listener in the Caddyfile.
 ENV PORT=80
 EXPOSE 80
 
+# Start FrankenPHP with our config file (explicit path = predictable).
 CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]

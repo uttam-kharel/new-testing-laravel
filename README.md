@@ -78,16 +78,26 @@ Both run on GitHub Actions free minutes. **Two deploy options — pick ONE** (se
 
 ## Branch flow
 
+Two branches exist (both pushed to GitHub):
+
 - **`main`** — development. CI runs on every push/PR, but nothing deploys.
 - **`production`** — deployable. Pushing to it builds the container image and
-  deploys to Vercel. **Protect it** (Settings → Branches → rule on
-  `production`: *Require a pull request + 1 approval + status checks*) so
-  changes can only arrive via reviewed PRs — see `GETTING_STARTED.md` §8.
+  deploys to Vercel (via the `deploy.yml` workflow + GitHub secrets).
+
+**Protect `production`** (Settings → Branches → Add rule on `production`:
+*Require a pull request + 1 approval + status checks*) so changes can only
+arrive via reviewed PRs — see `GETTING_STARTED.md` §8.
 
 ```bash
-git checkout -b production && git push -u origin production   # one-time setup
-# ship: feature branch → PR against production → approve → merge (auto-deploys)
+# ship a change (daily flow):
+git checkout -b my-feature
+# ...edit, commit...
+git push -u origin my-feature
+# open a PR against `production` → CI runs, Vercel posts a preview URL →
+# approve + merge → deploy.yml builds the image and deploys to Vercel
 ```
+
+> A push straight to `main` never deploys anything — only `production` does.
 
 ## Deploying (first time / new Vercel account)
 

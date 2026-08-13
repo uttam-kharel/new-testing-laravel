@@ -1,5 +1,28 @@
+# ============================================================
+# Caddyfile — FrankenPHP server config (web server + PHP runtime)
+# ============================================================
+# FrankenPHP is Caddy + PHP in one binary. On boot, the container
+# runs `frankenphp run --config /etc/caddy/Caddyfile`, which reads
+# THIS file to know what to serve and how.
+#
+# Vercel terminates TLS at its edge and proxies plain HTTP to the
+# container, so we bind to Vercel's PORT and never handle HTTPS here.
+
+# :{$PORT:80} — listen on the PORT env var (set by Vercel), or port 80
+# if it's missing (the Dockerfile also defaults ENV PORT=80). The
+# leading ":" binds all container interfaces, not just localhost.
 :{$PORT:80} {
+	# Document root: Laravel's public/ directory (where index.php lives).
+	# Every request is resolved against this folder.
 	root * /app/public
+
+	# Compress responses — zstd first, gzip as fallback. Smaller payloads,
+	# faster page loads, free wins for any website.
 	encode zstd gzip
+
+	# FrankenPHP's "php_server" directive: routes requests through the
+	# PHP front controller (public/index.php → Laravel). It serves
+	# static files directly (CSS/JS/images) and hands everything else
+	# to PHP. This one line is the whole Laravel routing story.
 	php_server
 }

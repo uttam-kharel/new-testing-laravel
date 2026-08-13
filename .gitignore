@@ -69,3 +69,10 @@ Homestead.yaml
 Thumbs.db
 .vercel
 .env*
+
+
+# ==================================================
+# Freebuff (this coding agent's local data) — never commit
+# ==================================================
+
+.freebuff
