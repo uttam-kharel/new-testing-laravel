@@ -97,6 +97,30 @@ git push -u origin my-feature
 # approve + merge → deploy-vercel.yml builds the image and deploys to Vercel
 ```
 
+> A push straight to `development` never deploys anything — only `production` does.
+
+### Make `development` the default branch (one-time, already done here)
+
+GitHub's default branch is what visitors land on when they open the repo, and
+GitHub **refuses to delete a branch while it's the default** — so this always
+comes first:
+
+1. GitHub → repo → **Settings → General** (left sidebar) → **Default branch** →
+   click the switch icon → pick `development` → **Update** → confirm.
+
+### Delete a branch (e.g. the old `main`)
+
+Only possible *after* `development` is the default branch. Either way works:
+
+- **Dashboard:** GitHub → repo → **Settings → Branches** → click the 🗑 delete
+  icon next to `main`.
+- **or CLI:** `git push origin :main` — then run `git remote prune origin`
+  locally to drop the stale `origin/main` tracking ref.
+
+> This repo already went through both steps — `main` is gone and `development`
+> is the default. These instructions are for reference (forks, new clones, or
+> if you ever rename branches again).
+
 ## Templates
 
 - **PRs** open with `.github/PULL_REQUEST_TEMPLATE.md` — change summary, test
@@ -104,9 +128,6 @@ git push -u origin my-feature
   live.
 - **Issues** use form templates: `.github/ISSUE_TEMPLATE/bug_report.yml` and
   `.github/ISSUE_TEMPLATE/feature_request.yml`.
-
-
-> A push straight to `development` never deploys anything — only `production` does.
 
 ## Deploying (first time / new Vercel account)
 
