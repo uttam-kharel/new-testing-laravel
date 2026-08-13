@@ -5,6 +5,9 @@ Laravel 13 + Tailwind CSS (Vite) landing site, hosted free on **Vercel** via the
 
 **Production:** https://shubham-international-hospital.vercel.app
 
+> 👉 **New here? Start with [`START_HERE.md`](START_HERE.md)** — one file that
+> takes you from zero to deployed.
+
 ---
 
 ## The stack (why this approach)
