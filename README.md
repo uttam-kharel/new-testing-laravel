@@ -56,7 +56,8 @@ curl http://localhost:8090/
 | `deploy-vercel.yml`   | push to `production`, PRs against it | Production deploy on push; preview deploy + URL comment on PR |
 
 Both run on GitHub Actions free minutes. **Two deploy options — pick ONE** (see
-`GETTING_STARTED.md` §7c for the full walkthrough):
+`GETTING_STARTED.md` §7c for the full walkthrough, or **`DEPLOYMENT.md`** for the
+complete token-based playbook — every click and command, in order):
 
 - **Option A (recommended, zero secrets):** Vercel dashboard → **Add New →
   Project → Import Git Repository** → pick this repo → framework **Other** →
