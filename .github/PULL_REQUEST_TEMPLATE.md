@@ -31,7 +31,7 @@
 <!-- This repo auto-deploys to Vercel ONLY when merged into `production`. -->
 
 - [ ] Targets **`production`** → merged code goes live on Vercel automatically
-- [ ] Targets **`main`** → development only, nothing deploys
+- [ ] Targets **`development`** → dev only, nothing deploys
 
 ## Screenshots (if UI changed)
 

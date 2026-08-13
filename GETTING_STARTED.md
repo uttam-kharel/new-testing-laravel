@@ -166,9 +166,9 @@ Expect: `Tests: 2 passed (2 assertions)`.
 ```bash
 git add .
 git commit -m "Initial commit"
-git branch -M main
+git branch -M development
 git remote add origin https://github.com/<your-username>/my-hospital.git
-git push -u origin main
+git push -u origin development
 ```
 
 Refresh the GitHub page — your code is now on GitHub. ✅
@@ -274,7 +274,7 @@ secrets, no command line:
    - Click **Deploy**. Vercel reads `Dockerfile.vercel` and builds it.
 4. After the first deploy, set the **Production Branch**:
    Project → **Settings → Git → Production Branch** → type `production`
-   → **Save**. Now only pushes to `production` go live; `main` stays a dev
+   → **Save**. Now only pushes to `production` go live; `development` stays a dev
    branch.
 5. Add the environment variables: Project → **Settings → Environment
    Variables** → add for **Production, Preview, Development**:
@@ -377,7 +377,7 @@ green/red in the **Actions** tab. Your repo has two workflows:
 
 | File | Triggers on | What it runs |
 | --- | --- | --- |
-| `check.yml` | push to `main`/`production`, any PR | PHP tests, Pint style check, Vite build, **Docker image build** |
+| `check.yml` | push to `development`/`production`, any PR | PHP tests, Pint style check, Vite build, **Docker image build** |
 | `deploy-vercel.yml` | push to `production` | Build + deploy to Vercel (production) |
 | `deploy-vercel.yml` | PR **against** `production` | Preview deploy + auto-comment the URL on the PR |
 
@@ -388,8 +388,8 @@ to push before configuring anything.
 
 ### The branch flow this repo uses
 
-- **`main`** — development. Pushing here runs CI only (tests + build).
-  Safe to push to directly.
+- **`development`** — where you develop. Pushing here runs CI only (tests +
+  build). Safe to push to directly.
 - **`production`** — deployable. Only this branch publishes to Vercel. It
   should be **protected** so nobody can push to it directly — changes arrive
   only through reviewed pull requests.
@@ -415,11 +415,11 @@ the only way in is a merged pull request.
 6. Turn on **Do not allow bypassing the above settings**.
 7. Click **Create**.
 
-Now try `git push origin main:production` — GitHub **rejects** it with
+Now try `git push origin development:production` — GitHub **rejects** it with
 "protected branch" errors. That's exactly what we want. ✅
 
-> The same protection idea can be applied to `main` later (then you can't push
-> to `main` either — everything flows through PRs).
+> The same protection idea can be applied to `development` later (then you
+> can't push to `development` either — everything flows through PRs).
 
 ### Ship a change (the PR-only daily workflow)
 
@@ -435,7 +435,7 @@ git push -u origin add-contact-form
 ```
 
 # 2. GitHub shows a yellow banner: "Compare & pull request" → click it.
-#    Base = production (or main), compare = your feature branch.
+#    Base = production (or development), compare = your feature branch.
 #    CI runs + a Vercel preview URL is commented on the PR.
 # 3. A reviewer approves, checks are green → click **Merge pull request**.
 # 4. The merge commits to `production` → the deploy workflow builds the
@@ -457,7 +457,7 @@ switching accounts changes **zero code**:
 4. Create a token in the new account (vercel.com/account/tokens).
 5. Update the 3 GitHub secrets with the new values (org/project IDs from the
    fresh `.vercel/project.json`).
-6. `git push origin main:production` → deploys to the new account.
+6. `git push origin development:production` → deploys to the new account.
 
 See the "Switching to a different Vercel account" section in `README.md` for
 the full steps and gotchas (old project/URL stays until deleted/transferred).

@@ -24,7 +24,7 @@ name: CI
 # ─────────────────────────────────────────────────────────────────────────────
 # "on" = WHEN does this workflow run?
 #
-#   push:          every time code is pushed to the `main` or `production`
+#   push:          every time code is pushed to the `development` or `production`
 #                  branch (the two important long-lived branches).
 #   pull_request:  every Pull Request, no matter which branch it targets —
 #                  this is how we check someone's changes before merging.
@@ -33,7 +33,7 @@ name: CI
 # ─────────────────────────────────────────────────────────────────────────────
 on:
     push:
-        branches: [main, production]
+        branches: [development, production]
     pull_request:
 
 # ─────────────────────────────────────────────────────────────────────────────

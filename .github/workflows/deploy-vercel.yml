@@ -6,8 +6,8 @@
 #   `production` branch, this workflow asks Vercel to build the Docker image
 #   (Dockerfile.vercel) and put it live at your .vercel.app URL.
 #
-# Why `production` and not `main`?
-#   `main` is your development branch — pushing there is safe and runs CI
+# Why `production` and not `development`?
+#   `development` is where you work — pushing there is safe and runs CI
 #   only. The live site may ONLY change via `production`:
 #     - push to production  → production deploy
 #     - PR against production → a temporary PREVIEW URL (free, isolated)
@@ -30,7 +30,7 @@ name: Deploy to Vercel
 
 # ─────────────────────────────────────────────────────────────────────────────
 # "on" = WHEN does this run?
-#   push:               only pushes to `production` (never main).
+#   push:               only pushes to `production` (never development).
 #   pull_request:       PRs that target `production` → preview deployments.
 #   workflow_dispatch:  adds a "Run workflow" button in the Actions tab,
 #                       so you can re-deploy manually anytime.

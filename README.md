@@ -80,7 +80,7 @@ Both run on GitHub Actions free minutes. **Two deploy options — pick ONE** (se
 
 Two branches exist (both pushed to GitHub):
 
-- **`main`** — development. CI runs on every push/PR, but nothing deploys.
+- **`development`** — where you develop. CI runs on every push/PR, but nothing deploys.
 - **`production`** — deployable. Pushing to it builds the container image and
   deploys to Vercel (via the `deploy-vercel.yml` workflow + GitHub secrets).
 
@@ -106,7 +106,7 @@ git push -u origin my-feature
   `.github/ISSUE_TEMPLATE/feature_request.yml`.
 
 
-> A push straight to `main` never deploys anything — only `production` does.
+> A push straight to `development` never deploys anything — only `production` does.
 
 ## Deploying (first time / new Vercel account)
 
@@ -160,7 +160,7 @@ VERCEL_ORG_ID     – from .vercel/project.json → "orgId"   (team_...)
 VERCEL_PROJECT_ID – from .vercel/project.json → "projectId" (prj_...)
 ```
 
-That's it — the next `git push origin main:production` builds and deploys to
+That's it — the next `git push origin development:production` builds and deploys to
 the **new account** automatically.
 
 Notes:
